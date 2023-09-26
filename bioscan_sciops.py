@@ -138,10 +138,7 @@ def main():
     parser = argparse.ArgumentParser("Generate bioscan sciops manifest given a list of plate IDs")
     parser.add_argument('-p', '--plates', help='File listing plates, one per line', required=True)
     parser.add_argument('-c', '--config', help='Config file with STS database credentials', default='../sts_config.ini')
-    # parser.add_argument('-s', '--stats', help='DADA2 stats tsv file', required=True)
     parser.add_argument('-o', '--outfile', help='Output file. Default: out.tsv', default='out.tsv')
-    parser.add_argument('-v', '--verbose', 
-                        help='Include INFO level log messages', action='store_true')
 
     args = parser.parse_args()
     
@@ -151,6 +148,7 @@ def main():
     with open(args.plates) as f:
         for line in f:
             plate = line.strip()
+            assert ' ' not in plate, f'plate "{plate}" contains space character, aborting'
             if len(plate) > 0:
                 plates.append(plate)
 
