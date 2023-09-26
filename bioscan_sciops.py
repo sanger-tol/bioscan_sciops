@@ -87,7 +87,7 @@ def query_sts(plates, config):
         df = pd.DataFrame(rows, columns=colnames)
         df['series'] = df['series'].astype(int)
         df = df.sort_values(by=['manifest','series']).reset_index(drop=True)
-        print(df)
+        # print(df)
        
         # close the communication with the PostgreSQL
         cur.close()
@@ -155,7 +155,7 @@ def main():
                 plates.append(plate)
 
     print(f'Querying STS for {len(plates)} plates')
-    df = query_sts(plates, args.config, args.verbose)
+    df = query_sts(plates, args.config)
     df = finalise_table(df)
     print(f'Writing to {args.outfile}')
     df.to_csv(args.outfile, sep='\t', index=False)
