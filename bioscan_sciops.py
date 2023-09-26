@@ -95,6 +95,8 @@ def query_sts(plates, config):
         df['plate_id'] = df['plate_id'].astype("category").cat.set_categories(plates)
         df['well_id'] = df['well_id'].astype("category").cat.set_categories(expected_wells)
         df = df.sort_values(by=['plate_id', 'well_id']).reset_index(drop=True)
+        # only works expecting YYYY-MM-DD format
+        df['date_of_sample_collection'] = df['date_of_sample_collection'].str.split('-').str.get(0).fillna('2023')
         nplates_extracted =  df.plate_id.nunique()
         if nplates_extracted != len(plates):
             missing_plates = set(plates) - set(df.plate_id.nunique())
