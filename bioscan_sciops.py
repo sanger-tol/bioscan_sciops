@@ -87,6 +87,7 @@ def query_sts(plates, config):
         df = pd.DataFrame(rows, columns=colnames)
         df['series'] = df['series'].astype(int)
         df = df.sort_values(by=['manifest','series']).reset_index(drop=True)
+        print(f'Extracted data for {df.sample_description.nunique()} plates')
         # print(df)
        
         # close the communication with the PostgreSQL
@@ -109,7 +110,8 @@ def finalise_table(df):
     # mark up controls
     df['bioscan_supplier_sample_name'] = df['specimen_id']
     df['bioscan_control_type'] = ''
-    pos_controls = ((df.common_name == 'blank sample') & (df.well_id == 'G12'))
+    # does not have to be (df.common_name == 'blank sample')
+    pos_controls = (df.well_id == 'G12')
     df.loc[pos_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_POS_' + df.loc[pos_controls, 'specimen_id']
     df.loc[pos_controls, 'bioscan_control_type'] = 'pcr positive'
     neg_controls = ((df.common_name == 'blank sample') & (df.well_id != 'G12'))
