@@ -1,3 +1,4 @@
+import itertools
 import argparse
 import psycopg2
 import pandas as pd
@@ -24,6 +25,11 @@ def read_config(filename, section='postgresql'):
 
 
 def query_sts(plates, config):
+
+    row_id = list('ABCDEFGH')
+    col_id = range(1,13)
+    expected_wells = [r + str(c) for (c, r) in itertools.product(col_id, row_id)]
+
 
     conn = None
     try:
@@ -66,8 +72,8 @@ def query_sts(plates, config):
         # sample.loc_id = location.location_id -> location.location - does not include country name
 
         query = (f'''
-            select sample.manifest_id, sample.series, sample.tubeid, sample.specimenid, gal.abbreviation, sample.col_date, 
-                species.taxonid, species.scientific_name, sample.rackid
+            select sample.rackid, sample.tubeid, sample.specimenid, gal.abbreviation, sample.col_date, 
+                species.taxonid, species.scientific_name
             from sample, sample_species, species, gal
             where sample.sample_id = sample_species.sample_id
                 and sample_species.species_id = species.species_id
@@ -83,11 +89,16 @@ def query_sts(plates, config):
         # dev_rows = cur.fetchall()
         # for row in dev_rows:
         #     print(row)
-        colnames = ['manifest', 'series', 'well_id', 'specimen_id', 'cohort', 'date_of_sample_collection', 'taxon_id', 'common_name', 'sample_description']
+        colnames = ['plate_id', 'well_id', 'specimen_id', 'cohort', 'date_of_sample_collection', 'taxon_id', 'common_name']
         df = pd.DataFrame(rows, columns=colnames)
-        df['series'] = df['series'].astype(int)
-        df = df.sort_values(by=['manifest','series']).reset_index(drop=True)
-        print(f'Extracted data for {df.sample_description.nunique()} plates')
+        df['sample_description'] = df['plate_id']
+        df['plate_id'] = df['plate_id'].astype("category").cat.set_categories(plates)
+        df['well_id'] = df['well_id'].astype("category").cat.set_categories(expected_wells)
+        df = df.sort_values(by=['plate_id', 'well_id']).reset_index(drop=True)
+        nplates_extracted =  df.plate_id.nunique()
+        if nplates_extracted != len(plates):
+            missing_plates = set(plates) - set(df.plate_id.nunique())
+            print(f'ERROR: could not find data for plates {missing_plates}')
         # print(df)
        
         # close the communication with the PostgreSQL
@@ -110,7 +121,7 @@ def finalise_table(df):
     # mark up controls
     df['bioscan_supplier_sample_name'] = df['specimen_id']
     df['bioscan_control_type'] = ''
-    # does not have to be (df.common_name == 'blank sample')
+    # pos control does not have to be (df.common_name == 'blank sample')
     pos_controls = (df.well_id == 'G12')
     df.loc[pos_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_POS_' + df.loc[pos_controls, 'specimen_id']
     df.loc[pos_controls, 'bioscan_control_type'] = 'pcr positive'
