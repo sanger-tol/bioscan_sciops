@@ -124,9 +124,10 @@ def finalise_table(df):
     df['bioscan_supplier_sample_name'] = df['specimen_id']
     df['bioscan_control_type'] = ''
     # pos control does not have to be (df.common_name == 'blank sample')
-    pos_controls = (df.well_id == 'G12')
-    df.loc[pos_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_POS_' + df.loc[pos_controls, 'specimen_id']
-    df.loc[pos_controls, 'bioscan_control_type'] = 'pcr positive'
+    # we do not modify positive controls
+    # pos_controls = (df.well_id == 'G12')
+    # df.loc[pos_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_POS_' + df.loc[pos_controls, 'specimen_id']
+    # df.loc[pos_controls, 'bioscan_control_type'] = 'pcr positive'
     neg_controls = ((df.common_name == 'blank sample') & (df.well_id != 'G12'))
     df.loc[neg_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_NEG_LYSATE_' + df.loc[neg_controls, 'specimen_id']
     df.loc[neg_controls, 'bioscan_control_type'] = 'lysate negative'
