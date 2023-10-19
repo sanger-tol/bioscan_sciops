@@ -100,7 +100,9 @@ def query_sts(plates, config):
         nplates_extracted =  df.plate_id.nunique()
         if nplates_extracted != len(plates):
             missing_plates = set(plates) - set(df.plate_id.nunique())
-            print(f'ERROR: could not find data for plates {missing_plates}')
+            print(f'ERROR: could not find STS data for plates {missing_plates}')
+        else:
+            print('All plates were found in STS')
         # print(df)
        
         # close the communication with the PostgreSQL
@@ -114,7 +116,7 @@ def query_sts(plates, config):
 
     return df
 
-def finalise_table(df):
+def finalise_table(df, is_lysate):
 
     # auto-fill
     df['country_of_origin'] = 'United Kingdom'
@@ -124,13 +126,25 @@ def finalise_table(df):
     df['bioscan_supplier_sample_name'] = df['specimen_id']
     df['bioscan_control_type'] = ''
     # pos control does not have to be (df.common_name == 'blank sample')
-    # we do not modify positive controls
-    # pos_controls = (df.well_id == 'G12')
-    # df.loc[pos_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_POS_' + df.loc[pos_controls, 'specimen_id']
-    # df.loc[pos_controls, 'bioscan_control_type'] = 'pcr positive'
+    # we do not modify positive controls for specimen plates
+    # we do add positive control for lysis plates
+    if is_lysate:
+        pos_controls = (df.well_id == 'G12')
+        df.loc[pos_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_POS_' + df.loc[pos_controls, 'specimen_id']
+        df.loc[pos_controls, 'taxon_id'] = '32644'
+        df.loc[pos_controls, 'common_name'] = 'unidentified'
+        # we do not touch sciops lims control type in case of lysate
+        # df.loc[pos_controls, 'bioscan_control_type'] = 'pcr positive'
     neg_controls = ((df.common_name == 'blank sample') & (df.well_id != 'G12'))
     df.loc[neg_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_NEG_LYSATE_' + df.loc[neg_controls, 'specimen_id']
     df.loc[neg_controls, 'bioscan_control_type'] = 'lysate negative'
+
+    # sanity check taxonomy
+    expected_taxa = ['unidentified','blank sample']
+    if not df.common_name.isin(expected_taxa).all():
+        unexpected_taxa = set(df.common_name.unique) - set(expected_taxa)
+        unexpected_taxa_samples = df.common_name.isin(unexpected_taxa).bioscan_supplier_sample_name.to_list()
+        print('ERROR: found unexpected taxa {unexpected_taxa} for samples {unexpected_taxa_samples}')
 
     # reorder columns
     out_df = df[[
@@ -155,6 +169,8 @@ def main():
     parser.add_argument('-p', '--plates', help='File listing plates, one per line', required=True)
     parser.add_argument('-c', '--config', help='Config file with STS database credentials', default='../sts_config.ini')
     parser.add_argument('-o', '--outfile', help='Output file. Default: out.tsv', default='out.tsv')
+    parser.add_argument('-l', '--lysate', help='Generate manifest for lysate plates, not specimen plates: '
+                        'add positive control at G12', action='store_true')
 
     args = parser.parse_args()
     
@@ -170,7 +186,7 @@ def main():
 
     print(f'Querying STS for {len(plates)} plates')
     df = query_sts(plates, args.config)
-    df = finalise_table(df)
+    df = finalise_table(df, is_lysate=args.lysate)
     print(f'Writing to {args.outfile}')
     df.to_csv(args.outfile, sep='\t', index=False)
 
