@@ -137,7 +137,8 @@ def finalise_table(df, is_lysate):
         # df.loc[pos_controls, 'bioscan_control_type'] = 'pcr positive'
     neg_controls = ((df.common_name == 'blank sample') & (df.well_id != 'G12'))
     df.loc[neg_controls, 'bioscan_supplier_sample_name'] = 'CONTROL_NEG_LYSATE_' + df.loc[neg_controls, 'specimen_id']
-    df.loc[neg_controls, 'bioscan_control_type'] = 'lysate negative'
+    # only mark H12 as lysate negative in control type
+    df.loc[neg_controls & (df.well_id == 'H12'), 'bioscan_control_type'] = 'lysate negative'
 
     # sanity check taxonomy
     expected_taxa = ['unidentified','blank sample']
