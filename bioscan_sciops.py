@@ -99,7 +99,7 @@ def query_sts(plates, config):
         df['date_of_sample_collection'] = df['date_of_sample_collection'].str.split('-').str.get(0).fillna('2023')
         nplates_extracted =  df.plate_id.nunique()
         if nplates_extracted != len(plates):
-            missing_plates = set(plates) - set(df.plate_id.nunique())
+            missing_plates = set(plates) - set(df.plate_id.unique())
             print(f'ERROR: could not find STS data for plates {missing_plates}')
         else:
             print('All plates were found in STS')
