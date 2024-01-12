@@ -5,21 +5,14 @@ import pandas as pd
 from tol.sources.portal import portal
 from tol.core import DataSourceFilter
 
+
 def query_portal(plates):
 
     prtl = portal()
     f = DataSourceFilter()
     f.in_list = {'sts_rackid': plates}
     samples = prtl.get_list('sample', object_filters=f)
-    sample_data = {
-        # 'plate_id':{}, 
-        # 'well_id':{}, 
-        # 'specimen_id':{}, 
-        # 'cohort':{}, 
-        # 'date_of_sample_collection':{}, 
-        # 'taxon_id':{}, 
-        # 'common_name':{}
-    }
+    sample_data = {}
     for i, sample in enumerate(samples):
         uid = sample.uid
         sample_data[uid] = {}
@@ -39,7 +32,6 @@ def query_portal(plates):
 
     df = pd.DataFrame(sample_data).T
     
-    
     missing_plates = set(plates) - set(df.plate_id.unique())
     extra_plates = set(df.plate_id.unique()) - set(plates)
 
@@ -52,12 +44,12 @@ def query_portal(plates):
 
     return df
 
+
 def finalise_table(df, plates, is_lysate):
 
     row_id = list('ABCDEFGH')
     col_id = range(1,13)
     expected_wells = [r + str(c) for (c, r) in itertools.product(col_id, row_id)]
-
 
     # sort values by plate and well
     df['plate_id'] = df['plate_id'].astype("category").cat.set_categories(plates)
@@ -114,6 +106,7 @@ def finalise_table(df, plates, is_lysate):
     out_df.columns = out_df.columns.str.replace('_',' ').str.upper()    
 
     return out_df
+
 
 def main():
     
