@@ -1,126 +1,77 @@
 import itertools
 import argparse
-import psycopg2
 import pandas as pd
-from configparser import ConfigParser
 
+from tol.sources.portal import portal
+from tol.core import DataSourceFilter
 
-def read_config(filename, section='postgresql'):
+def query_portal(plates):
 
-    # create a parser
-    parser = ConfigParser()
-    # read config file
-    parser.read(filename)
+    prtl = portal()
+    f = DataSourceFilter()
+    f.in_list = {'sts_rackid': plates}
+    samples = prtl.get_list('sample', object_filters=f)
+    sample_data = {
+        # 'plate_id':{}, 
+        # 'well_id':{}, 
+        # 'specimen_id':{}, 
+        # 'cohort':{}, 
+        # 'date_of_sample_collection':{}, 
+        # 'taxon_id':{}, 
+        # 'common_name':{}
+    }
+    for i, sample in enumerate(samples):
+        uid = sample.uid
+        sample_data[uid] = {}
+        sample_data[uid]['plate_id'] = sample.sts_rackid
+        sample_data[uid]['well_id'] = sample.sts_tubeid
+        sample_data[uid]['specimen_id'] = sample.sts_specimen.id
+        sample_data[uid]['cohort'] = sample.sts_gal_abbreviation
+        sample_data[uid]['date_of_sample_collection'] = sample.sts_col_date
+        sample_data[uid]['taxon_id'] = sample.sts_species.id
+        # sample.sts_species.sts_scientific_name seems unavailable
+        if sample.sts_species.id == '32644':
+            sample_data[uid]['common_name'] = 'unidentified'
+        elif sample.sts_species.id == '2582415':
+            sample_data[uid]['common_name'] = 'blank sample'
+        else:
+            raise ValueError(f'taxon id {sample.sts_species.id} not expected for BIOSCAN samples')
 
-    # get section, default to postgresql
-    db = {}
-    if parser.has_section(section):
-        params = parser.items(section)
-        for param in params:
-            db[param[0]] = param[1]
-    else:
-        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
+    df = pd.DataFrame(sample_data).T
+    
+    
+    missing_plates = set(plates) - set(df.plate_id.unique())
+    extra_plates = set(df.plate_id.unique()) - set(plates)
 
-    return db
+    if len(missing_plates) > 0:
+        print(f'ERROR: could not locate plates in ToL Portal {missing_plates}')
+    if len(extra_plates) > 0:
+        print(f'ERROR: data extracted for extra plates {extra_plates}')
+    if len(missing_plates) == 0 and len(extra_plates) == 0:
+        print('All plates were found in STS')
 
+    return df
 
-def query_sts(plates, config):
+def finalise_table(df, plates, is_lysate):
 
     row_id = list('ABCDEFGH')
     col_id = range(1,13)
     expected_wells = [r + str(c) for (c, r) in itertools.product(col_id, row_id)]
 
 
-    conn = None
-    try:
-        # read connection parameters
-        params = read_config(config)
+    # sort values by plate and well
+    df['plate_id'] = df['plate_id'].astype("category").cat.set_categories(plates)
+    df['well_id'] = df['well_id'].astype("category").cat.set_categories(expected_wells)
+    df = df.sort_values(by=['plate_id', 'well_id']).reset_index(drop=True)
 
-        # connect to the PostgreSQL server
-        print('Connecting to the PostgreSQL database...')
-        conn = psycopg2.connect(**params)
-        
-        # create a cursor
-        cur = conn.cursor()
-        
-        # execute a statement
-        print('PostgreSQL database version:')
-        cur.execute('SELECT version()')
-
-        # display the PostgreSQL database server version
-        db_version = cur.fetchone()
-        print(db_version)
-
-        # template query to check table columns
-        # dev_query = ('''
-        #     SELECT
-        #         attname AS colname,
-        #         pg_catalog.format_type(atttypid, atttypmod) AS coltype
-        #     FROM
-        #         pg_catalog.pg_attribute
-        #     WHERE
-        #         attnum > 0 AND
-        #         NOT attisdropped AND
-        #         attrelid = 'gal'::regclass
-        #     ORDER BY
-        #         attnum ASC
-        #     ''')
-
-        # Execute a PostgreSQL query
-        
-        # collection country not properly recorded - sample.collection_country_id is always None
-        # sample.loc_id = location.location_id -> location.location - does not include country name
-
-        query = (f'''
-            select sample.rackid, sample.tubeid, sample.specimenid, gal.abbreviation, sample.col_date, 
-                species.taxonid, species.scientific_name
-            from sample, sample_species, species, gal
-            where sample.sample_id = sample_species.sample_id
-                and sample_species.species_id = species.species_id
-                and sample.gal_id = gal.gal_id
-                and rackid in {str(plates).replace('[','(').replace(']',')')}
-            ''')
-
-        cur.execute(query)
-
-        # Fetch and print the results
-        rows = cur.fetchall()
-        # cur.execute(dev_query)
-        # dev_rows = cur.fetchall()
-        # for row in dev_rows:
-        #     print(row)
-        colnames = ['plate_id', 'well_id', 'specimen_id', 'cohort', 'date_of_sample_collection', 'taxon_id', 'common_name']
-        df = pd.DataFrame(rows, columns=colnames)
-        df['sample_description'] = df['plate_id']
-        df['plate_id'] = df['plate_id'].astype("category").cat.set_categories(plates)
-        df['well_id'] = df['well_id'].astype("category").cat.set_categories(expected_wells)
-        df = df.sort_values(by=['plate_id', 'well_id']).reset_index(drop=True)
-        # only works expecting YYYY-MM-DD format
-        df['date_of_sample_collection'] = df['date_of_sample_collection'].str.split('-').str.get(0).fillna('2023')
-        nplates_extracted =  df.plate_id.nunique()
-        if nplates_extracted != len(plates):
-            missing_plates = set(plates) - set(df.plate_id.unique())
-            print(f'ERROR: could not find STS data for plates {missing_plates}')
-        else:
-            print('All plates were found in STS')
-        # print(df)
-       
-        # close the communication with the PostgreSQL
-        cur.close()
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(error)
-    finally:
-        if conn is not None:
-            conn.close()
-            print('Database connection closed.')
-
-    return df
-
-def finalise_table(df, is_lysate):
+    # only collection year needed. This only works expecting YYYY-MM-DD format
+    # blank samples will have collection year of the previous sample
+    df['date_of_sample_collection'] = df['date_of_sample_collection'].fillna(method='ffill').astype(str).str.split('-').str.get(0)
 
     # auto-fill
     df['country_of_origin'] = 'United Kingdom'
     df['retention_instruction'] = 'Return to customer after 2 years'
+    df['sample_description'] = df['plate_id']
 
     # mark up controls
     df['bioscan_supplier_sample_name'] = df['specimen_id']
@@ -168,7 +119,6 @@ def main():
     
     parser = argparse.ArgumentParser("Generate bioscan sciops manifest given a list of plate IDs")
     parser.add_argument('-p', '--plates', help='File listing plates, one per line', required=True)
-    parser.add_argument('-c', '--config', help='Config file with STS database credentials', default='../sts_config.ini')
     parser.add_argument('-o', '--outfile', help='Output file. Default: out.tsv', default='out.tsv')
     parser.add_argument('-l', '--lysate', help='Generate manifest for lysate plates, not specimen plates: '
                         'add positive control at G12', action='store_true')
@@ -185,9 +135,15 @@ def main():
             if len(plate) > 0:
                 plates.append(plate)
 
-    print(f'Querying STS for {len(plates)} plates')
-    df = query_sts(plates, args.config)
-    df = finalise_table(df, is_lysate=args.lysate)
+    max_plates = 104
+    if len(plates) > max_plates:
+        raise ValueError(f'Can only query ToL portal for 10,000 samples max - this is {max_plates} plates')
+
+    print(f'Querying ToL Portal for {len(plates)} plates')
+    df = query_portal(plates)
+    plate_type = 'lysate' if args.lysate else 'specimen'
+    print(f'Adjusting tables for {plate_type} plate SciOps submission ')
+    df = finalise_table(df, plates, args.lysate)
     print(f'Writing to {args.outfile}')
     df.to_csv(args.outfile, sep='\t', index=False)
 
