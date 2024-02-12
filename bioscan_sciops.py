@@ -114,7 +114,7 @@ def main():
         "By default, specimen (LILYS) manifest is generated.")
     parser.add_argument('-p', '--plates', help='File listing plates, one per line', required=True)
     parser.add_argument('-o', '--outfile', help='Output file. Default: out.tsv', default='out.tsv')
-    parser.add_argument('-l', '--lysate', help='Generate manifest for lysate (LSBN) plates instead: '
+    parser.add_argument('-l', '--lysate', help='Generate manifest for lysate (LBSN) plates instead: '
                         'add positive control at G12', action='store_true')
 
     args = parser.parse_args()
@@ -135,7 +135,7 @@ def main():
 
     print(f'Querying ToL Portal for {len(plates)} plates')
     df = query_portal(plates)
-    plate_type = 'lysate (LSBN)' if args.lysate else 'specimen (LILYS)'
+    plate_type = 'lysate (LBSN)' if args.lysate else 'specimen (LILYS)'
     print(f'Adjusting tables for {plate_type} plate SciOps submission ')
     df = finalise_table(df, plates, args.lysate)
     print(f'Writing to {args.outfile}')
