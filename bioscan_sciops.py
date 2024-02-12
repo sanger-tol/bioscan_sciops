@@ -58,7 +58,7 @@ def finalise_table(df, plates, is_lysate):
 
     # only collection year needed. This only works expecting YYYY-MM-DD format
     # blank samples will have collection year of the previous sample
-    df['date_of_sample_collection'] = df['date_of_sample_collection'].fillna(method='ffill').astype(str).str.split('-').str.get(0)
+    df['date_of_sample_collection'] = df['date_of_sample_collection'].ffill().astype(str).str.split('-').str.get(0)
 
     # auto-fill
     df['country_of_origin'] = 'United Kingdom'
