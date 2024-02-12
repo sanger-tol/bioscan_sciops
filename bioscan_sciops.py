@@ -40,7 +40,7 @@ def query_portal(plates):
     if len(extra_plates) > 0:
         print(f'ERROR: data extracted for extra plates {extra_plates}')
     if len(missing_plates) == 0 and len(extra_plates) == 0:
-        print('All plates were found in STS')
+        print('All plates were found in ToL Portal')
 
     return df
 
