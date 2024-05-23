@@ -6,7 +6,7 @@ from tol.sources.portal import portal
 from tol.core import DataSourceFilter
 
 
-def query_portal(plates):
+def query_portal(plates, verbose):
 
     prtl = portal()
     f = DataSourceFilter()
@@ -18,6 +18,8 @@ def query_portal(plates):
         sample_data[uid] = {}
         sample_data[uid]['plate_id'] = sample.sts_rackid
         sample_data[uid]['well_id'] = sample.sts_tubeid
+        if verbose:
+            print(uid, sample.sts_rackid, sample.sts_tubeid)
         sample_data[uid]['specimen_id'] = sample.sts_specimen.id
         sample_data[uid]['cohort'] = sample.sts_gal_abbreviation
         sample_data[uid]['date_of_sample_collection'] = sample.sts_col_date
@@ -116,6 +118,8 @@ def main():
     parser.add_argument('-o', '--outfile', help='Output file. Default: out.tsv', default='out.tsv')
     parser.add_argument('-l', '--lysate', help='Generate manifest for lysate (LBSN) plates instead: '
                         'add positive control at G12', action='store_true')
+    parser.add_argument('-v', '--verbose', help='Include sample-level messages', 
+                        action='store_true', default=False)
 
     args = parser.parse_args()
     
@@ -131,10 +135,12 @@ def main():
 
     max_plates = 104
     if len(plates) > max_plates:
-        raise ValueError(f'Can only query ToL portal for 10,000 samples max - this is {max_plates} plates')
+        raise ValueError(
+            f'Can only query ToL portal for 10,000 samples max - this is {max_plates} plates'
+            )
 
     print(f'Querying ToL Portal for {len(plates)} plates')
-    df = query_portal(plates)
+    df = query_portal(plates, args.verbose)
     plate_type = 'lysate (LBSN)' if args.lysate else 'specimen (LILYS)'
     print(f'Adjusting tables for {plate_type} plate SciOps submission ')
     df = finalise_table(df, plates, args.lysate)
