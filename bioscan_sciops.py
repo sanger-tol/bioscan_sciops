@@ -15,11 +15,18 @@ def query_portal(plates, verbose):
     sample_data = {}
     for i, sample in enumerate(samples):
         uid = sample.uid
+        # workaround for deleted entries
+        if sample.sts_sampleset_id is None:
+            if verbose:
+                print('excluding', uid, sample.sts_rackid, sample.sts_tubeid)
+            continue
+        if verbose:
+            print(uid, sample.sts_rackid, sample.sts_tubeid)
+        
         sample_data[uid] = {}
         sample_data[uid]['plate_id'] = sample.sts_rackid
         sample_data[uid]['well_id'] = sample.sts_tubeid
-        if verbose:
-            print(uid, sample.sts_rackid, sample.sts_tubeid)
+        
         sample_data[uid]['specimen_id'] = sample.sts_specimen.id
         sample_data[uid]['cohort'] = sample.sts_gal_abbreviation
         sample_data[uid]['date_of_sample_collection'] = sample.sts_col_date
@@ -61,6 +68,8 @@ def finalise_table(df, plates, is_lysate):
     # only collection year needed. This only works expecting YYYY-MM-DD format
     # blank samples will have collection year of the previous sample
     df['date_of_sample_collection'] = df['date_of_sample_collection'].ffill().astype(str).str.split('-').str.get(0)
+    if df['date_of_sample_collection'].isna().any():
+        print('Warning: empty time entries (NaT) were generated - please fix manually')
 
     # auto-fill
     df['country_of_origin'] = 'United Kingdom'
