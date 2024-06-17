@@ -10,7 +10,7 @@ def query_portal(plates, verbose):
 
     prtl = portal()
     f = DataSourceFilter()
-    f.in_list = {'sts_rackid': plates}
+    f.and_ = {'sts_rackid': {'in_list': {'value': plates}}}
     samples = prtl.get_list('sample', object_filters=f)
     sample_data = {}
     for i, sample in enumerate(samples):
