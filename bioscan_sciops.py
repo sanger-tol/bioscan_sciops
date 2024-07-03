@@ -16,10 +16,10 @@ def query_portal(plates, verbose):
     for i, sample in enumerate(samples):
         uid = sample.uid
         # workaround for deleted entries
-        if sample.sts_sampleset_id is None:
-            if verbose:
-                print('excluding', uid, sample.sts_rackid, sample.sts_tubeid)
-            continue
+        # if sample.sts_sampleset_id is None:
+        #     if verbose:
+        #         print('excluding', uid, sample.sts_rackid, sample.sts_tubeid)
+        #     continue
         if verbose:
             print(uid, sample.sts_rackid, sample.sts_tubeid)
         
