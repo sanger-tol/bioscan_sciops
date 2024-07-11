@@ -30,14 +30,19 @@ def query_portal(plates, verbose):
         sample_data[uid]['specimen_id'] = sample.sts_specimen.id
         sample_data[uid]['cohort'] = sample.sts_gal_abbreviation
         sample_data[uid]['date_of_sample_collection'] = sample.sts_col_date
-        sample_data[uid]['taxon_id'] = sample.sts_species.id
-        # sample.sts_species.sts_scientific_name seems unavailable
-        if sample.sts_species.id == '32644':
-            sample_data[uid]['common_name'] = 'unidentified'
-        elif sample.sts_species.id == '2582415':
-            sample_data[uid]['common_name'] = 'blank sample'
+        if hasattr(sample.sts_species, 'id'):
+            sample_data[uid]['taxon_id'] = sample.sts_species.id
+            # sample.sts_species.sts_scientific_name seems unavailable
+            if sample.sts_species.id == '32644':
+                sample_data[uid]['common_name'] = 'unidentified'
+            elif sample.sts_species.id == '2582415':
+                sample_data[uid]['common_name'] = 'blank sample'
+            else:
+                raise ValueError(f'taxon id {sample.sts_species.id} not expected for BIOSCAN samples')
         else:
-            raise ValueError(f'taxon id {sample.sts_species.id} not expected for BIOSCAN samples')
+            print(f'no species information for {sample.sts_specimen.id}')
+            sample_data[uid]['taxon_id'] = '32644'
+            sample_data[uid]['common_name'] = 'unidentified'
 
     df = pd.DataFrame(sample_data).T
     
