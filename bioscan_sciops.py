@@ -188,7 +188,7 @@ def main():
             #     f'found {sts_sampleset} instead'
             #     )
 
-    assert args.outfile.endswith('tsv'), 'can only write to ".tsv" file'
+    assert args.outfile.endswith('tsv') or args.outfile.endswith('xlsx'), 'can only write to ".tsv" or ".xlsx" file'
     
     plates = []
     with open(args.plates) as f:
@@ -215,7 +215,10 @@ def main():
     print(f'Adjusting tables for {plate_type} plate SciOps submission ')
     df = finalise_table(df, plates, args.lysate)
     print(f'Writing to {args.outfile}')
-    df.to_csv(args.outfile, sep='\t', index=False)
+    if args.outfile.endswith('tsv'):
+        df.to_csv(args.outfile, sep='\t', index=False)
+    elif args.outfile.endswith('xlsx'):
+        df.to_excel(args.outfile, index=False)
 
 
 if __name__ == '__main__':
