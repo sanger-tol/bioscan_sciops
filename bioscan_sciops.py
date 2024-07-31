@@ -50,9 +50,9 @@ def query_portal(plates, verbose):
     extra_plates = set(df.plate_id.unique()) - set(plates)
 
     if len(missing_plates) > 0:
-        print(f'ERROR: could not locate plates in ToL Portal {missing_plates}')
+        print(f'ERROR: could not locate plates in ToL Portal {sorted(missing_plates)}')
     if len(extra_plates) > 0:
-        print(f'ERROR: data extracted for extra plates {extra_plates}')
+        print(f'ERROR: data extracted for extra plates {sorted(extra_plates)}')
     if len(missing_plates) == 0 and len(extra_plates) == 0:
         print('All plates were found in ToL Portal')
 
