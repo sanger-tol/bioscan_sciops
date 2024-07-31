@@ -1,10 +1,11 @@
 import itertools
 import argparse
 import pandas as pd
+import os
+import re
 
 from tol.sources.portal import portal
 from tol.core import DataSourceFilter
-
 
 def query_portal(plates, verbose):
 
@@ -56,8 +57,7 @@ def query_portal(plates, verbose):
     if len(missing_plates) == 0 and len(extra_plates) == 0:
         print('All plates were found in ToL Portal')
 
-    return df
-
+    return df, missing_plates
 
 def finalise_table(df, plates, is_lysate):
 
@@ -121,12 +121,51 @@ def finalise_table(df, plates, is_lysate):
 
     return out_df
 
+def add_sts_meta(df, missing_plates, sts_fn):
+
+    print(f'adding STS metadata from {sts_fn}')
+    sts_df = pd.read_excel(sts_fn, sheet_name='Metadata Entry')
+
+    added_plates_df = sts_df[sts_df.RACK_OR_PLATE_ID.isin(missing_plates)].copy()
+    if added_plates_df.shape[0] > 0:
+        added_plates_df['plate_id'] = added_plates_df['RACK_OR_PLATE_ID']
+        added_plates_df['well_id'] = added_plates_df['TUBE_OR_WELL_ID']
+        added_plates_df['specimen_id'] = added_plates_df['SPECIMEN_ID']
+        cohort = sts_fn.split('/')[-1].split('.')[0].split('_')[0]
+        added_plates_df['cohort'] = cohort
+        added_plates_df['date_of_sample_collection'] = added_plates_df['DATE_OF_COLLECTION']
+        added_plates_df['taxon_id'] = added_plates_df['TAXON_ID']
+        added_plates_df['common_name'] = added_plates_df['SCIENTIFIC_NAME']
+
+        added_plates = added_plates_df.plate_id.unique()
+        print(f'added plates {", ".join(added_plates)}')
+
+    df = pd.concat([
+        df,
+        added_plates_df[[
+            'plate_id',
+            'well_id',
+            'specimen_id',
+            'cohort',
+            'date_of_sample_collection',
+            'taxon_id',
+            'common_name'
+            ]]
+    ]).reset_index(drop=True)
+
+    missing_plates = missing_plates - set(added_plates)
+
+    return df, missing_plates
+
 
 def main():
     
     parser = argparse.ArgumentParser("Generate bioscan sciops manifest given a list of plate IDs. "
         "By default, specimen (LILYS) manifest is generated.")
     parser.add_argument('-p', '--plates', help='File listing plates, one per line', required=True)
+    parser.add_argument('-s', '--sts_manifests', 
+        help='STS manifest used to fill sample info for plates missing in portal ()', 
+        action='append')
     parser.add_argument('-o', '--outfile', help='Output file. Default: out.tsv', default='out.tsv')
     parser.add_argument('-l', '--lysate', help='Generate manifest for lysate (LBSN) plates instead: '
                         'add positive control at G12', action='store_true')
@@ -134,7 +173,21 @@ def main():
                         action='store_true', default=False)
 
     args = parser.parse_args()
-    
+
+    if args.sts_manifests is not None:
+        for sts_fn in args.sts_manifests:
+            assert os.path.isfile(sts_fn)
+            cohort = sts_fn.split('/')[-1].split('.')[0].split('_')[0]
+            assert re.match(r'^[A-Z]{4}$', cohort), (
+                f'we need STS manifest filename to start with four-letter partner code '
+                f'followed by underscore, found {cohort} instead'
+                )
+            # sts_sampleset = sts_fn.split('/')[-1].split('.')[0]
+            # assert re.match(r'^[A-Z]{4}_[0-9]{6}$', sts_sampleset), (
+            #     f'we need STS manifest filename to be STS sampleset ID like ABCD_123456, '
+            #     f'found {sts_sampleset} instead'
+            #     )
+
     assert args.outfile.endswith('tsv'), 'can only write to ".tsv" file'
     
     plates = []
@@ -152,7 +205,12 @@ def main():
             )
 
     print(f'Querying ToL Portal for {len(plates)} plates')
-    df = query_portal(plates, args.verbose)
+    df, missing_plates = query_portal(plates, args.verbose)
+    if len(missing_plates) > 0 and args.sts_manifests is not None:
+        for sts_fn in args.sts_manifests:
+            df, missing_plates = add_sts_meta(df, missing_plates, sts_fn)
+        if len(missing_plates) > 0:
+            print(f'could not find STS metadata for plates {sorted(missing_plates)}')
     plate_type = 'lysate (LBSN)' if args.lysate else 'specimen (LILYS)'
     print(f'Adjusting tables for {plate_type} plate SciOps submission ')
     df = finalise_table(df, plates, args.lysate)
