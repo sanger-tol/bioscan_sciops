@@ -2,3 +2,4 @@ out.tsv
 .DS_Store
 results/
 .env.dev
+.ipynb_checkpoints/
