@@ -46,6 +46,9 @@ def query_portal(plates, verbose):
             sample_data[uid]['common_name'] = 'unidentified'
 
     df = pd.DataFrame(sample_data).T
+
+    if len(df) == 0:
+        df = pd.DataFrame(columns='plate_id well_id specimen_id cohort date_of_sample_collection taxon_id common_name'.split())
     
     missing_plates = set(plates) - set(df.plate_id.unique())
     extra_plates = set(df.plate_id.unique()) - set(plates)
@@ -127,7 +130,9 @@ def add_sts_meta(df, missing_plates, sts_fn):
     sts_df = pd.read_excel(sts_fn, sheet_name='Metadata Entry')
 
     added_plates_df = sts_df[sts_df.RACK_OR_PLATE_ID.isin(missing_plates)].copy()
-    if added_plates_df.shape[0] > 0:
+    if added_plates_df.shape[0] == 0:
+        print(f'no plates added from {sts_fn}')
+    else:
         added_plates_df['plate_id'] = added_plates_df['RACK_OR_PLATE_ID']
         added_plates_df['well_id'] = added_plates_df['TUBE_OR_WELL_ID']
         added_plates_df['specimen_id'] = added_plates_df['SPECIMEN_ID']
@@ -140,20 +145,20 @@ def add_sts_meta(df, missing_plates, sts_fn):
         added_plates = added_plates_df.plate_id.unique()
         print(f'added plates {", ".join(added_plates)}')
 
-    df = pd.concat([
-        df,
-        added_plates_df[[
-            'plate_id',
-            'well_id',
-            'specimen_id',
-            'cohort',
-            'date_of_sample_collection',
-            'taxon_id',
-            'common_name'
-            ]]
-    ]).reset_index(drop=True)
+        df = pd.concat([
+            df,
+            added_plates_df[[
+                'plate_id',
+                'well_id',
+                'specimen_id',
+                'cohort',
+                'date_of_sample_collection',
+                'taxon_id',
+                'common_name'
+                ]]
+        ]).reset_index(drop=True)
 
-    missing_plates = missing_plates - set(added_plates)
+        missing_plates = missing_plates - set(added_plates)
 
     return df, missing_plates
 
@@ -210,7 +215,9 @@ def main():
         for sts_fn in args.sts_manifests:
             df, missing_plates = add_sts_meta(df, missing_plates, sts_fn)
         if len(missing_plates) > 0:
-            print(f'could not find STS metadata for plates {sorted(missing_plates)}')
+            print(f'Could not find STS metadata for plates {sorted(missing_plates)}')
+        else:
+            print(f'Found all plates in Portal or STS')
     plate_type = 'lysate (LBSN)' if args.lysate else 'specimen (LILYS)'
     print(f'Adjusting tables for {plate_type} plate SciOps submission ')
     df = finalise_table(df, plates, args.lysate)
