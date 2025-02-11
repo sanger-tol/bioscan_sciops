@@ -20,7 +20,7 @@ def query_portal(samplesets):
         f.and_ = {'sts_project': {'eq': {'value': 'BIOSCAN'}}, 'sts_sampleset.id': {'eq': {'value': sampleset}}}
         samples = prtl.get_list('sample', object_filters=f)
         print('unpacking...')
-        sampletadata = [sample._CoreDataObject__attributes for sample in samples]
+        sampletadata = [sample.attributes for sample in samples]
         if len(sampletadata) == 0:
             raise ValueError(f'no samples found for {sampleset} in bioscan')
         pd.DataFrame(sampletadata).to_csv(sampleset_fn, index=False)
