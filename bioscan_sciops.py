@@ -1,4 +1,5 @@
 import itertools
+import datetime
 import argparse
 import pandas as pd
 import os
@@ -171,7 +172,10 @@ def main():
     parser.add_argument('-s', '--sts_manifests', 
         help='STS manifest used to fill sample info for plates missing in portal ()', 
         action='append')
-    parser.add_argument('-o', '--outfile', help='Output file. Default: out.tsv', default='out.tsv')
+    parser.add_argument(
+        '-o', '--outfile', 
+        help='Output file. Default: results/[lilys/lbsn]_YYYYMMDD.xlsx', 
+        default=None)
     parser.add_argument('-l', '--lysate', help='Generate manifest for lysate (LBSN) plates instead: '
                         'add positive control at G12', action='store_true')
     parser.add_argument('-v', '--verbose', help='Include sample-level messages', 
@@ -193,6 +197,12 @@ def main():
             #     f'found {sts_sampleset} instead'
             #     )
 
+    if args.outfile is None:
+        today = datetime.datetime.now().strftime('%Y%m%d')
+        if args.lysate:
+            args.outfile = f'results/lbsn_{today}.xlsx'
+        else:
+            args.outfile = f'results/lilys_{today}.xlsx'
     assert args.outfile.endswith('tsv') or args.outfile.endswith('xlsx'), 'can only write to ".tsv" or ".xlsx" file'
     
     plates = []
