@@ -16,7 +16,10 @@ def query_portal(plates, verbose):
     samples = prtl.get_list('sample', object_filters=f)
     sample_data = {}
     for i, sample in enumerate(samples):
-        uid = sample.uid
+        # print(sample.id)
+        # print(sample.attributes)
+        # raise Exception('debug')
+        uid = sample.id
         # workaround for deleted entries
         # if sample.sts_sampleset_id is None:
         #     if verbose:
@@ -74,6 +77,12 @@ def finalise_table(df, plates, is_lysate):
     df['well_id'] = df['well_id'].astype("category").cat.set_categories(expected_wells)
     df = df.sort_values(by=['plate_id', 'well_id']).reset_index(drop=True)
 
+    # check for plate completeness
+    samples_per_plate = df['plate_id'].value_counts()
+    incomplete_plates = samples_per_plate[samples_per_plate != 96]
+    if len(incomplete_plates) > 0:
+        print(f'ERROR: incomplete plates found: {incomplete_plates}')
+
     # only collection year needed. This only works expecting YYYY-MM-DD format
     # blank samples will have collection year of the previous sample
     df['date_of_sample_collection'] = df['date_of_sample_collection'].ffill().bfill().astype(str).str.split('-').str.get(0)
@@ -125,12 +134,12 @@ def finalise_table(df, plates, is_lysate):
 
     return out_df
 
-def add_sts_meta(df, missing_plates, sts_fn):
+def add_sts_meta(df, plates, sts_fn):
 
     print(f'adding STS metadata from {sts_fn}')
     sts_df = pd.read_excel(sts_fn, sheet_name='Metadata Entry')
 
-    added_plates_df = sts_df[sts_df.RACK_OR_PLATE_ID.isin(missing_plates)].copy()
+    added_plates_df = sts_df[sts_df.RACK_OR_PLATE_ID.isin(plates)].copy()
     if added_plates_df.shape[0] == 0:
         print(f'no plates added from {sts_fn}')
     else:
@@ -159,7 +168,7 @@ def add_sts_meta(df, missing_plates, sts_fn):
                 ]]
         ]).reset_index(drop=True)
 
-        missing_plates = missing_plates - set(added_plates)
+        missing_plates = [plate for plate in plates if plate not in added_plates]
 
     return df, missing_plates
 
@@ -170,7 +179,7 @@ def main():
         "By default, specimen (LILYS) manifest is generated.")
     parser.add_argument('-p', '--plates', help='File listing plates, one per line', required=True)
     parser.add_argument('-s', '--sts_manifests', 
-        help='STS manifest used to fill sample info for plates missing in portal ()', 
+        help='STS manifest used to add sample info prior to querying portal', 
         action='append')
     parser.add_argument(
         '-o', '--outfile', 
@@ -183,20 +192,6 @@ def main():
 
     args = parser.parse_args()
 
-    if args.sts_manifests is not None:
-        for sts_fn in args.sts_manifests:
-            assert os.path.isfile(sts_fn)
-            cohort = sts_fn.split('/')[-1].split('.')[0].split('_')[0]
-            assert re.match(r'^[A-Z]{4}$', cohort), (
-                f'we need STS manifest filename to start with four-letter partner code '
-                f'followed by underscore, found {cohort} instead'
-                )
-            # sts_sampleset = sts_fn.split('/')[-1].split('.')[0]
-            # assert re.match(r'^[A-Z]{4}_[0-9]{6}$', sts_sampleset), (
-            #     f'we need STS manifest filename to be STS sampleset ID like ABCD_123456, '
-            #     f'found {sts_sampleset} instead'
-            #     )
-
     if args.outfile is None:
         today = datetime.datetime.now().strftime('%Y%m%d')
         if args.lysate:
@@ -204,7 +199,7 @@ def main():
         else:
             args.outfile = f'results/lilys_{today}.xlsx'
     assert args.outfile.endswith('tsv') or args.outfile.endswith('xlsx'), 'can only write to ".tsv" or ".xlsx" file'
-    
+
     plates = []
     with open(args.plates) as f:
         for line in f:
@@ -212,6 +207,22 @@ def main():
             assert ' ' not in plate, f'plate "{plate}" contains space character, aborting'
             if len(plate) > 0:
                 plates.append(plate)
+
+    if args.sts_manifests is not None:
+        df = pd.DataFrame()
+        for sts_fn in args.sts_manifests:
+            assert os.path.isfile(sts_fn)
+            cohort = sts_fn.split('/')[-1].split('.')[0].split('_')[0]
+            assert re.match(r'^[A-Z]{4}$', cohort), (
+                f'we need STS manifest filename to start with four-letter partner code '
+                f'followed by underscore, found {cohort} instead'
+                )
+            df, plates = add_sts_meta(df, plates, sts_fn)
+            # sts_sampleset = sts_fn.split('/')[-1].split('.')[0]
+            # assert re.match(r'^[A-Z]{4}_[0-9]{6}$', sts_sampleset), (
+            #     f'we need STS manifest filename to be STS sampleset ID like ABCD_123456, '
+            #     f'found {sts_sampleset} instead'
+            #     )
 
     max_plates = 104
     if len(plates) > max_plates:
@@ -221,13 +232,11 @@ def main():
 
     print(f'Querying ToL Portal for {len(plates)} plates')
     df, missing_plates = query_portal(plates, args.verbose)
-    if len(missing_plates) > 0 and args.sts_manifests is not None:
-        for sts_fn in args.sts_manifests:
-            df, missing_plates = add_sts_meta(df, missing_plates, sts_fn)
-        if len(missing_plates) > 0:
+    if len(missing_plates):
             print(f'Could not find STS metadata for plates {sorted(missing_plates)}')
-        else:
-            print(f'Found all plates in Portal or STS')
+    else:
+        print(f'Found all plates in Portal or STS')
+
     plate_type = 'lysate (LBSN)' if args.lysate else 'specimen (LILYS)'
     print(f'Adjusting tables for {plate_type} plate SciOps submission ')
     df = finalise_table(df, plates, args.lysate)
