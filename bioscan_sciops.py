@@ -229,13 +229,20 @@ def main():
         raise ValueError(
             f'Can only query ToL portal for 10,000 samples max - this is {max_plates} plates'
             )
-
-    print(f'Querying ToL Portal for {len(plates)} plates')
-    df, missing_plates = query_portal(plates, args.verbose)
-    if len(missing_plates):
-            print(f'Could not find STS metadata for plates {sorted(missing_plates)}')
+    if len(plates) == 0:
+        print('Skipping portal query as all plates added from STS manifest')
     else:
-        print(f'Found all plates in Portal or STS')
+        print(f'Querying ToL Portal for {len(plates)} plates')
+        portal_df, missing_plates = query_portal(plates, args.verbose)
+        df = pd.concat([
+            df,
+            portal_df
+            ]).reset_index(drop=True)
+
+        if len(missing_plates) > 0:
+            print(f'Could not find plates on portal: {sorted(missing_plates)}')
+        else:
+            print(f'Found all {len(plates)} plates')
 
     plate_type = 'lysate (LBSN)' if args.lysate else 'specimen (LILYS)'
     print(f'Adjusting tables for {plate_type} plate SciOps submission ')
