@@ -51,7 +51,7 @@ def main():
             assert ' ' not in sampleset, f'plate "{sampleset}" contains space character, aborting'
             if len(sampleset) > 0: # skipping empty lines
                 samplesets.append(sampleset)
-    print(f'found {len(sampleset)} samplesets, proceeding to portal query')
+    print(f'found {len(samplesets)} samplesets, proceeding to portal query')
 
     query_portal(samplesets)
 
