@@ -208,8 +208,9 @@ def main():
             if len(plate) > 0:
                 plates.append(plate)
 
+    df = pd.DataFrame()
+
     if args.sts_manifests is not None:
-        df = pd.DataFrame()
         for sts_fn in args.sts_manifests:
             assert os.path.isfile(sts_fn)
             cohort = sts_fn.split('/')[-1].split('.')[0].split('_')[0]
