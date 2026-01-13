@@ -1,6 +1,8 @@
 # bioscan_sciops
 Script for generation of bioscan sciops manifest given a list of plate IDs
 
+DEPRECATED, active version now at https://github.com/sanger-tol/bioscan-ops/tree/master/analysis/bioscan_sciops
+
 ## Installation
 
 This script requires python=3.10, tol-sdk, and pandas
